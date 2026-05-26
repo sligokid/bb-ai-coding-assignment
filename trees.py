@@ -12,9 +12,22 @@ def extract_street_names(node: dict) -> Generator[str, None, None]:
             yield from extract_street_names(value)
 
 
+def _detect_encoding(filepath: str) -> str:
+    """Detect file encoding by trying common encodings in order."""
+    with open(filepath, "rb") as f:
+        raw = f.read()
+    for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+        try:
+            raw.decode(encoding)
+            return encoding
+        except UnicodeDecodeError:
+            continue
+    raise ValueError(f"Could not determine encoding for {filepath}")
+
+
 def load_tree_categories(filepath: str) -> tuple[set[str], set[str]]:
     """Load trees JSON and return (short_streets, tall_streets)."""
-    with open(filepath, encoding="utf-8") as f:
+    with open(filepath, encoding=_detect_encoding(filepath)) as f:
         data = json.load(f)
     short_streets = set(extract_street_names(data["short"]))
     tall_streets = set(extract_street_names(data["tall"]))
@@ -23,7 +36,7 @@ def load_tree_categories(filepath: str) -> tuple[set[str], set[str]]:
 
 def load_properties(filepath: str) -> list[dict]:
     """Read property CSV and return list of row dicts."""
-    with open(filepath, encoding="utf-8-sig") as f:
+    with open(filepath, encoding=_detect_encoding(filepath)) as f:
         return list(csv.DictReader(f))
 
 

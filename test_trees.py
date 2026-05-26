@@ -1,6 +1,51 @@
+import tempfile
+import os
+
 import pytest
 
-from trees import calculate_average_price, extract_street_names, load_tree_categories, parse_price
+from trees import _detect_encoding, calculate_average_price, extract_street_names, load_tree_categories, parse_price
+
+
+def _write_tmp(content: bytes) -> str:
+    fd, path = tempfile.mkstemp()
+    os.write(fd, content)
+    os.close(fd)
+    return path
+
+
+def test_detect_encoding_utf8():
+    path = _write_tmp("hello".encode("utf-8"))
+    try:
+        assert _detect_encoding(path) == "utf-8-sig"
+    finally:
+        os.unlink(path)
+
+
+def test_detect_encoding_utf8_sig():
+    path = _write_tmp("\ufeffhello".encode("utf-8-sig"))
+    try:
+        assert _detect_encoding(path) == "utf-8-sig"
+    finally:
+        os.unlink(path)
+
+
+def test_detect_encoding_cp1252():
+    # b'\x80' is valid cp1252 (€) but not valid utf-8 or utf-8-sig
+    path = _write_tmp(b"caf\x80")
+    try:
+        assert _detect_encoding(path) == "cp1252"
+    finally:
+        os.unlink(path)
+
+
+def test_detect_encoding_unknown_raises():
+    # b'\x81' is invalid in cp1252
+    path = _write_tmp(b"\x81\x8d\x8f\x90\x9d")
+    try:
+        with pytest.raises(ValueError, match="Could not determine encoding"):
+            _detect_encoding(path)
+    finally:
+        os.unlink(path)
 
 
 def test_extract_street_names():
